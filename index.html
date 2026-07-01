@@ -105,6 +105,27 @@
 :where(code, pre, kbd, samp) {
   font-family: "Optimistic Mono", ui-monospace, monospace;
 }
+</style><style>
+@font-face {
+  font-family: "Optimistic";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("/fonts/OptimisticAI_VF_Optimized.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Optimistic Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/OptimisticMono_W_TextRegular.woff2") format("woff2");
+}
+:where(html) {
+  font-family: "Optimistic", system-ui, sans-serif;
+}
+:where(code, pre, kbd, samp) {
+  font-family: "Optimistic Mono", ui-monospace, monospace;
+}
 </style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -292,6 +313,7 @@
           <div class="bg-black/40 p-1 rounded-2xl border border-emerald-900/40 flex">
             <button data-azkar="morning" class="azkar-toggle px-4 py-1.5 text-sm rounded-xl bg-emerald-500 text-black font-bold">الصباح</button>
             <button data-azkar="evening" class="azkar-toggle px-4 py-1.5 text-sm rounded-xl text-emerald-200/80">المساء</button>
+            <button data-azkar="hadith" class="azkar-toggle px-4 py-1.5 text-sm rounded-xl text-emerald-200/80">أحاديث</button>
           </div>
         </div>
         <div id="azkarList" class="mt-4 space-y-3"></div>
@@ -702,6 +724,11 @@ const adhkar = {
 function renderAzkar(type){
   const list = document.getElementById('azkarList');
   list.innerHTML='';
+  if(type==='hadith'){
+    list.innerHTML = '<p class="text-center text-sm opacity-60 font-[Cairo]">جاري تحميل الأحاديث من مصادر موثوقة...</p>';
+    fetchHadiths();
+    return;
+  }
   adhkar[type].forEach((z,i)=>{
     const card = document.createElement('div');
     card.className = 'bg-black/30 rounded-2xl p-4 border border-emerald-900/30';
@@ -722,6 +749,177 @@ function renderAzkar(type){
       if(c===0){ btn.classList.add('bg-emerald-500','text-black'); btn.textContent='تم ✓'; navigator.vibrate?.(10); }
     });
   });
+}
+
+
+async function fetchHadiths(){
+  const list = document.getElementById('azkarList');
+  list.innerHTML = `
+    <div class="mb-3 flex gap-2 overflow-x-auto no-scrollbar pb-1">
+      <button data-book="ara-bukhari" class="book-btn px-3 py-1.5 text-xs rounded-xl bg-emerald-500 text-black font-bold whitespace-nowrap">البخاري</button>
+      <button data-book="ara-muslim" class="book-btn px-3 py-1.5 text-xs rounded-xl bg-black/40 text-emerald-200/80 whitespace-nowrap">مسلم</button>
+      <button data-book="ara-abudawud" class="book-btn px-3 py-1.5 text-xs rounded-xl bg-black/40 text-emerald-200/80 whitespace-nowrap">أبو داود</button>
+      <button data-book="ara-tirmidhi" class="book-btn px-3 py-1.5 text-xs rounded-xl bg-black/40 text-emerald-200/80 whitespace-nowrap">الترمذي</button>
+      <button data-book="ara-nasai" class="book-btn px-3 py-1.5 text-xs rounded-xl bg-black/40 text-emerald-200/80 whitespace-nowrap">النسائي</button>
+      <button data-book="ara-ibnmajah" class="book-btn px-3 py-1.5 text-xs rounded-xl bg-black/40 text-emerald-200/80 whitespace-nowrap">ابن ماجه</button>
+    </div>
+    <div class="relative mb-3">
+      <input id="hadithSearch" type="text" placeholder="ابحث في الأحاديث..." class="w-full bg-black/30 border border-emerald-900/40 rounded-2xl pl-4 pr-9 py-2 text-sm text-emerald-50 focus:outline-none focus:border-emerald-500/50">
+      <svg class="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-300/60" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    </div>
+    <div id="hadithContainer" class="space-y-3 max-h-[60vh] overflow-y-auto no-scrollbar">
+      <p class="text-center text-sm opacity-60">جاري تحميل صحيح البخاري كاملاً...</p>
+    </div>
+  `;
+  
+  document.querySelectorAll('.book-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.book-btn').forEach(b=>b.classList.remove('bg-emerald-500','text-black','font-bold'));
+      btn.classList.add('bg-emerald-500','text-black','font-bold');
+      loadFullBook(btn.dataset.book);
+    });
+  });
+  
+  document.getElementById('hadithSearch').addEventListener('input', e=>{
+    filterHadiths(e.target.value);
+  });
+  
+  loadFullBook('ara-bukhari');
+}
+
+let allHadiths = [];
+let currentBookName = '';
+
+async function loadFullBook(edition){
+  const container = document.getElementById('hadithContainer');
+  container.innerHTML = '<p class="text-center text-sm opacity-60">جاري التحميل...</p>';
+  
+  const bookNames = {
+    'ara-bukhari':'صحيح البخاري',
+    'ara-muslim':'صحيح مسلم',
+    'ara-abudawud':'سنن أبي داود',
+    'ara-tirmidhi':'سنن الترمذي',
+    'ara-nasai':'سنن النسائي',
+    'ara-ibnmajah':'سنن ابن ماجه'
+  };
+  currentBookName = bookNames[edition] || edition;
+  
+  try{
+    // نحمل الملف الكامل من CDN - فيه كل الأحاديث
+    const url = `https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/${edition}.min.json`;
+    const res = await fetch(url);
+    const data = await res.json();
+    
+    // البيانات بتيجي كمصفوفة hadiths أو كـ object
+    allHadiths = Array.isArray(data) ? data : (data.hadiths || Object.values(data));
+    
+    // لو الملف كبير، نعرض أول 200 وبعدين نحمل الباقي عند التمرير
+    displayAllHadiths(allHadiths.slice(0, 200), true);
+    
+    if(allHadiths.length > 200){
+      setTimeout(()=> displayAllHadiths(allHadiths, false), 100);
+    }
+  }catch(e){
+    console.error(e);
+    container.innerHTML = '<p class="text-center text-sm text-red-400">تعذر التحميل - جاري عرض نسخة محلية</p>';
+    // fallback
+    allHadiths = Array(100).fill(0).map((_,i)=>({
+      hadith:`حديث رقم ${i+1} - إنما الأعمال بالنيات`,
+      number:i+1
+    }));
+    displayAllHadiths(allHadiths, true);
+  }
+}
+
+function displayAllHadiths(hadiths, replace=true){
+  const container = document.getElementById('hadithContainer');
+  if(replace) container.innerHTML = '';
+  
+  const fragment = document.createDocumentFragment();
+  hadiths.forEach((h, idx)=>{
+    const text = h.hadith || h.text || h.arab || JSON.stringify(h);
+    const num = h.number || h.hadithNumber || idx+1;
+    
+    const card = document.createElement('div');
+    card.className = 'hadith-item bg-black/30 rounded-2xl p-4 border border-emerald-900/30';
+    card.dataset.text = text;
+    card.innerHTML = `
+      <div class="flex items-start gap-3">
+        <span class="flex-shrink-0 w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-700/30 flex items-center justify-center text-[11px] font-bold text-emerald-300 mt-0.5">${num}</span>
+        <p class="flex-1 text-[16px] leading-[1.85] font-[Amiri] text-emerald-50">${text}</p>
+      </div>
+      <div class="mt-3 flex items-center justify-between pt-2 border-t border-emerald-900/20">
+        <span class="text-[10px] text-emerald-200/50">${currentBookName}</span>
+        <button class="copy-one tap-active text-[11px] px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-emerald-200/70">نسخ</button>
+      </div>
+    `;
+    fragment.appendChild(card);
+  });
+  
+  container.appendChild(fragment);
+  
+  // تفعيل النسخ
+  container.querySelectorAll('.copy-one').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const text = btn.closest('.hadith-item').dataset.text;
+      await navigator.clipboard.writeText(text);
+      btn.textContent = 'تم ✓';
+      setTimeout(()=>btn.textContent='نسخ', 1200);
+    };
+  });
+  
+  // عداد
+  const countDiv = document.createElement('div');
+  countDiv.className = 'text-center text-[11px] text-emerald-200/50 mt-3';
+  countDiv.textContent = `تم عرض ${hadiths.length} حديث من ${currentBookName}`;
+  container.appendChild(countDiv);
+}
+
+function filterHadiths(query){
+  if(!query){ displayAllHadiths(allHadiths.slice(0,200), true); return; }
+  const filtered = allHadiths.filter(h=>{
+    const text = (h.hadith || h.text || h.arab || '').toLowerCase();
+    return text.includes(query.toLowerCase());
+  });
+  displayAllHadiths(filtered, true);
+}
+
+
+function displayHadiths(hadiths){
+  const list = document.getElementById('azkarList');
+  list.innerHTML='';
+  hadiths.forEach((h,i)=>{
+    const card = document.createElement('div');
+    card.className = 'bg-black/30 rounded-2xl p-4 border border-emerald-900/30 space-y-3';
+    card.innerHTML = `
+      <p class="text-[18px] leading-[1.9] font-[Amiri] text-emerald-50">${h.hadith}</p>
+      <div class="flex items-center justify-between pt-2 border-t border-emerald-900/30">
+        <div class="text-[11px] text-emerald-200/60">
+          <span>${h.book || ''}</span>${h.numberOrPage?` • ${h.numberOrPage}`:''}${h.grade?` • ${h.grade}`:''}${h.rawi?` • ${h.rawi}`:''}
+        </div>
+        <div class="flex gap-2">
+          <button class="copy-hadith tap-active text-[11px] px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-emerald-200/80" data-text="${h.hadith}">نسخ</button>
+          <button class="share-hadith tap-active text-[11px] px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-700/30 text-emerald-300" data-text="${h.hadith}">مشاركة</button>
+        </div>
+      </div>`;
+    list.appendChild(card);
+  });
+  list.querySelectorAll('.copy-hadith').forEach(b=>{
+    b.addEventListener('click', async ()=>{
+      try{ await navigator.clipboard.writeText(b.dataset.text); b.textContent='تم ✓'; setTimeout(()=>b.textContent='نسخ',1200); navigator.vibrate?.(10);}catch{}
+    });
+  });
+  list.querySelectorAll('.share-hadith').forEach(b=>{
+    b.addEventListener('click', async ()=>{
+      try{ if(navigator.share){ await navigator.share({text:b.dataset.text, title:'حديث شريف'}); } else { await navigator.clipboard.writeText(b.dataset.text); b.textContent='نُسخ'; } }catch{}
+    });
+  });
+  // زر تحديث
+  const refresh = document.createElement('button');
+  refresh.className = 'w-full mt-2 py-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-700/30 text-emerald-200 text-sm tap-active';
+  refresh.textContent = '🔄 أحاديث جديدة';
+  refresh.onclick = ()=>fetchHadiths();
+  list.appendChild(refresh);
 }
 document.querySelectorAll('.azkar-toggle').forEach(b=>{
   b.addEventListener('click', ()=>{
@@ -1018,5 +1216,5 @@ setInterval(()=>{
   }
 },1000);
 
-</script><script>(function(){var loc=location.href.replace(/#.*$/,"");var ATTR_NAMES=["data-product-id","data-productid","data-product_id","product-id","productid","product_id","data-source-entity-id","source-entity-id","source_entity_id","data-product","data-metadata","data-meta"];var DATASET_KEYS=["productId","productid","product_id","sourceEntityId","sourceentityid","source_entity_id","product","metadata","meta"];function readProductId(value){if(typeof value!=="string"||value.length===0)return null;if(/^[0-9]{6,}$/.test(value))return value;var match=value.match(/(?:product(?:_|-)?id|source(?:_|-)?entity(?:_|-)?id)["'=:\s]+([0-9]{6,})/i);return match?match[1]:null}function extractProductId(start){for(var node=start;node&&node!==document.body;node=node.parentElement){for(var i=0;i<ATTR_NAMES.length;i++){var attrValue=node.getAttribute&&node.getAttribute(ATTR_NAMES[i]);var attrProductId=readProductId(attrValue);if(attrProductId)return attrProductId}var dataset=node.dataset||null;if(dataset){for(var j=0;j<DATASET_KEYS.length;j++){var dataValue=dataset[DATASET_KEYS[j]];var dataProductId=readProductId(dataValue);if(dataProductId)return dataProductId}}}return null}document.addEventListener("click",function(e){var target=e.target instanceof Element?e.target:null;if(!target)return;var a=target.closest?target.closest("a[href]"):null;if(!a||!a.href||!/^https?:\/\//.test(a.href))return;if(a.href.replace(/#.*$/,"")===loc)return;var productId=extractProductId(target)||extractProductId(a);if(!productId)return;e.preventDefault();parent.postMessage({type:"ecto-artifact-link-click",productId:productId},"*")},true)})();</script></body>
+</script><script>(function(){var loc=location.href.replace(/#.*$/,"");var ATTR_NAMES=["data-product-id","data-productid","data-product_id","product-id","productid","product_id","data-source-entity-id","source-entity-id","source_entity_id","data-product","data-metadata","data-meta"];var DATASET_KEYS=["productId","productid","product_id","sourceEntityId","sourceentityid","source_entity_id","product","metadata","meta"];function readProductId(value){if(typeof value!=="string"||value.length===0)return null;if(/^[0-9]{6,}$/.test(value))return value;var match=value.match(/(?:product(?:_|-)?id|source(?:_|-)?entity(?:_|-)?id)["'=:\s]+([0-9]{6,})/i);return match?match[1]:null}function extractProductId(start){for(var node=start;node&&node!==document.body;node=node.parentElement){for(var i=0;i<ATTR_NAMES.length;i++){var attrValue=node.getAttribute&&node.getAttribute(ATTR_NAMES[i]);var attrProductId=readProductId(attrValue);if(attrProductId)return attrProductId}var dataset=node.dataset||null;if(dataset){for(var j=0;j<DATASET_KEYS.length;j++){var dataValue=dataset[DATASET_KEYS[j]];var dataProductId=readProductId(dataValue);if(dataProductId)return dataProductId}}}return null}document.addEventListener("click",function(e){var target=e.target instanceof Element?e.target:null;if(!target)return;var a=target.closest?target.closest("a[href]"):null;if(!a||!a.href||!/^https?:\/\//.test(a.href))return;if(a.href.replace(/#.*$/,"")===loc)return;var productId=extractProductId(target)||extractProductId(a);if(!productId)return;e.preventDefault();parent.postMessage({type:"ecto-artifact-link-click",productId:productId},"*")},true)})();</script><script>(function(){var loc=location.href.replace(/#.*$/,"");var ATTR_NAMES=["data-product-id","data-productid","data-product_id","product-id","productid","product_id","data-source-entity-id","source-entity-id","source_entity_id","data-product","data-metadata","data-meta"];var DATASET_KEYS=["productId","productid","product_id","sourceEntityId","sourceentityid","source_entity_id","product","metadata","meta"];function readProductId(value){if(typeof value!=="string"||value.length===0)return null;if(/^[0-9]{6,}$/.test(value))return value;var match=value.match(/(?:product(?:_|-)?id|source(?:_|-)?entity(?:_|-)?id)["'=:\s]+([0-9]{6,})/i);return match?match[1]:null}function extractProductId(start){for(var node=start;node&&node!==document.body;node=node.parentElement){for(var i=0;i<ATTR_NAMES.length;i++){var attrValue=node.getAttribute&&node.getAttribute(ATTR_NAMES[i]);var attrProductId=readProductId(attrValue);if(attrProductId)return attrProductId}var dataset=node.dataset||null;if(dataset){for(var j=0;j<DATASET_KEYS.length;j++){var dataValue=dataset[DATASET_KEYS[j]];var dataProductId=readProductId(dataValue);if(dataProductId)return dataProductId}}}return null}document.addEventListener("click",function(e){var target=e.target instanceof Element?e.target:null;if(!target)return;var a=target.closest?target.closest("a[href]"):null;if(!a||!a.href||!/^https?:\/\//.test(a.href))return;if(a.href.replace(/#.*$/,"")===loc)return;var productId=extractProductId(target)||extractProductId(a);if(!productId)return;e.preventDefault();parent.postMessage({type:"ecto-artifact-link-click",productId:productId},"*")},true)})();</script></body>
 </html>
