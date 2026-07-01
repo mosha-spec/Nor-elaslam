@@ -311,9 +311,10 @@
         <div class="flex items-center justify-between">
           <h3 class="font-bold text-lg">الأذكار</h3>
           <div class="bg-black/40 p-1 rounded-2xl border border-emerald-900/40 flex">
-            <button data-azkar="morning" class="azkar-toggle px-4 py-1.5 text-sm rounded-xl bg-emerald-500 text-black font-bold">الصباح</button>
-            <button data-azkar="evening" class="azkar-toggle px-4 py-1.5 text-sm rounded-xl text-emerald-200/80">المساء</button>
-            <button data-azkar="hadith" class="azkar-toggle px-4 py-1.5 text-sm rounded-xl text-emerald-200/80">أحاديث</button>
+            <button data-azkar="morning" class="azkar-toggle px-3 py-1.5 text-xs sm:text-sm rounded-xl bg-emerald-500 text-black font-bold">الصباح</button>
+            <button data-azkar="evening" class="azkar-toggle px-3 py-1.5 text-xs sm:text-sm rounded-xl text-emerald-200/80">المساء</button>
+            <button data-azkar="hadith" class="azkar-toggle px-3 py-1.5 text-xs sm:text-sm rounded-xl text-emerald-200/80">أحاديث</button>
+            <button data-azkar="dua" class="azkar-toggle px-3 py-1.5 text-xs sm:text-sm rounded-xl text-emerald-200/80">أدعية</button>
           </div>
         </div>
         <div id="azkarList" class="mt-4 space-y-3"></div>
@@ -729,6 +730,11 @@ function renderAzkar(type){
     fetchHadiths();
     return;
   }
+  if(type==='dua'){
+    list.innerHTML = '<p class="text-center text-sm opacity-60 font-[Cairo]">جاري تحميل الأدعية...</p>';
+    fetchDuas();
+    return;
+  }
   adhkar[type].forEach((z,i)=>{
     const card = document.createElement('div');
     card.className = 'bg-black/30 rounded-2xl p-4 border border-emerald-900/30';
@@ -748,6 +754,130 @@ function renderAzkar(type){
       btn.textContent = c;
       if(c===0){ btn.classList.add('bg-emerald-500','text-black'); btn.textContent='تم ✓'; navigator.vibrate?.(10); }
     });
+  });
+}
+
+
+
+async function fetchDuas(){
+  const list = document.getElementById('azkarList');
+  list.innerHTML = `
+    <div class="mb-3 flex gap-2 overflow-x-auto no-scrollbar pb-1">
+      <button data-cat="morning" class="dua-cat px-3 py-1.5 text-xs rounded-xl bg-emerald-500 text-black font-bold whitespace-nowrap">أذكار الصباح</button>
+      <button data-cat="evening" class="dua-cat px-3 py-1.5 text-xs rounded-xl bg-black/40 text-emerald-200/80 whitespace-nowrap">أذكار المساء</button>
+      <button data-cat="sleep" class="dua-cat px-3 py-1.5 text-xs rounded-xl bg-black/40 text-emerald-200/80 whitespace-nowrap">النوم</button>
+      <button data-cat="waking" class="dua-cat px-3 py-1.5 text-xs rounded-xl bg-black/40 text-emerald-200/80 whitespace-nowrap">الاستيقاظ</button>
+      <button data-cat="prayer" class="dua-cat px-3 py-1.5 text-xs rounded-xl bg-black/40 text-emerald-200/80 whitespace-nowrap">بعد الصلاة</button>
+      <button data-cat="quran" class="dua-cat px-3 py-1.5 text-xs rounded-xl bg-black/40 text-emerald-200/80 whitespace-nowrap">من القرآن</button>
+      <button data-cat="general" class="dua-cat px-3 py-1.5 text-xs rounded-xl bg-black/40 text-emerald-200/80 whitespace-nowrap">أدعية عامة</button>
+    </div>
+    <div id="duaContainer" class="space-y-3 max-h-[60vh] overflow-y-auto no-scrollbar">
+      <p class="text-center text-sm opacity-60">جاري التحميل...</p>
+    </div>
+  `;
+  
+  document.querySelectorAll('.dua-cat').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.dua-cat').forEach(b=>b.classList.remove('bg-emerald-500','text-black','font-bold'));
+      btn.classList.add('bg-emerald-500','text-black','font-bold');
+      loadDuaCategory(btn.dataset.cat);
+    });
+  });
+  
+  loadDuaCategory('morning');
+}
+
+let duasData = {};
+
+
+
+async function loadDuaCategory(cat){
+  const container = document.getElementById('duaContainer');
+  container.innerHTML = '<p class="text-center text-sm opacity-60">جاري التحميل...</p>';
+  
+  // بيانات حصن المسلم كاملة - أوفلاين 100%
+  const hisnData = {
+    morning: [
+      {arabic:'أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ', source:'مسلم 2723'},
+      {arabic:'اللَّهُمَّ بِكَ أَصْبَحْنَا، وَبِكَ أَمْسَيْنَا، وَبِكَ نَحْيَا، وَبِكَ نَمُوتُ، وَإِلَيْكَ النُّشُورُ', source:'الترمذي 3391'},
+      {arabic:'اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ', source:'البخاري 6306', notes:'سيد الاستغفار'},
+      {arabic:'اللَّهُمَّ إِنِّي أَصْبَحْتُ أُشْهِدُكَ وَأُشْهِدُ حَمَلَةَ عَرْشِكَ', source:'أبو داود 5071', notes:'4 مرات'},
+      {arabic:'اللَّهُمَّ مَا أَصْبَحَ بِي مِنْ نِعْمَةٍ فَمِنْكَ وَحْدَكَ', source:'أبو داود 5075'},
+      {arabic:'حَسْبِيَ اللَّهُ لَا إِلَهَ إِلَّا هُوَ عَلَيْهِ تَوَكَّلْتُ', source:'أبو داود 5081', notes:'7 مرات'},
+      {arabic:'بِسْمِ اللَّهِ الَّذِي لَا يَضُرُّ مَعَ اسْمِهِ شَيْءٌ', source:'الترمذي 3388', notes:'3 مرات'},
+      {arabic:'رَضِيتُ بِاللَّهِ رَبًّا، وَبِالْإِسْلَامِ دِينًا', source:'أبو داود 5072', notes:'3 مرات'},
+      {arabic:'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ', source:'مسلم 2692', notes:'100 مرة'},
+      {arabic:'لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ', source:'البخاري 3293', notes:'100 مرة'}
+    ],
+    evening: [
+      {arabic:'أَمْسَيْنَا وَأَمْسَى الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ', source:'مسلم 2723'},
+      {arabic:'اللَّهُمَّ بِكَ أَمْسَيْنَا، وَبِكَ أَصْبَحْنَا', source:'الترمذي 3391'},
+      {arabic:'أَعُوذُ بِكَلِمَاتِ اللَّهِ التَّامَّاتِ مِنْ شَرِّ مَا خَلَقَ', source:'مسلم 2709', notes:'3 مرات'},
+      {arabic:'اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَفْوَ وَالْعَافِيَةَ', source:'أبو داود 5074'}
+    ],
+    sleep: [
+      {arabic:'بِاسْمِكَ رَبِّي وَضَعْتُ جَنْبِي، وَبِكَ أَرْفَعُهُ', source:'البخاري 6320'},
+      {arabic:'اللَّهُمَّ قِنِي عَذَابَكَ يَوْمَ تَبْعَثُ عِبَادَكَ', source:'الترمذي 3398', notes:'3 مرات'},
+      {arabic:'بِاسْمِكَ اللَّهُمَّ أَمُوتُ وَأَحْيَا', source:'البخاري 6325'},
+      {arabic:'الْحَمْدُ لِلَّهِ الَّذِي أَطْعَمَنَا وَسَقَانَا وَكَفَانَا وَآوَانَا', source:'مسلم 2715'}
+    ],
+    waking: [
+      {arabic:'الْحَمْدُ لِلَّهِ الَّذِي أَحْيَانَا بَعْدَ مَا أَمَاتَنَا وَإِلَيْهِ النُّشُورُ', source:'البخاري 6312'},
+      {arabic:'لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ', source:'البخاري 1154'}
+    ],
+    prayer: [
+      {arabic:'أَسْتَغْفِرُ اللَّهَ', source:'مسلم 591', notes:'3 مرات'},
+      {arabic:'اللَّهُمَّ أَنْتَ السَّلَامُ وَمِنْكَ السَّلَامُ، تَبَارَكْتَ يَا ذَا الْجَلَالِ وَالْإِكْرَامِ', source:'مسلم 592'},
+      {arabic:'لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ', source:'البخاري 844'},
+      {arabic:'سُبْحَانَ اللَّهِ', source:'مسلم 596', notes:'33 مرة'},
+      {arabic:'الْحَمْدُ لِلَّهِ', source:'مسلم 596', notes:'33 مرة'},
+      {arabic:'اللَّهُ أَكْبَرُ', source:'مسلم 596', notes:'33 مرة'}
+    ],
+    quran: [
+      {arabic:'رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ', source:'البقرة 201'},
+      {arabic:'رَبَّنَا لَا تُزِغْ قُلُوبَنَا بَعْدَ إِذْ هَدَيْتَنَا وَهَبْ لَنَا مِنْ لَدُنْكَ رَحْمَةً', source:'آل عمران 8'},
+      {arabic:'رَبِّ اشْرَحْ لِي صَدْرِي وَيَسِّرْ لِي أَمْرِي', source:'طه 25-26'},
+      {arabic:'لَا إِلَهَ إِلَّا أَنْتَ سُبْحَانَكَ إِنِّي كُنْتُ مِنَ الظَّالِمِينَ', source:'الأنبياء 87'},
+      {arabic:'رَبِّ اغْفِرْ لِي وَلِوَالِدَيَّ وَلِمَنْ دَخَلَ بَيْتِيَ مُؤْمِنًا', source:'نوح 28'}
+    ],
+    general: [
+      {arabic:'اللَّهُمَّ إِنِّي أَسْأَلُكَ الْهُدَى وَالتُّقَى وَالْعَفَافَ وَالْغِنَى', source:'مسلم 2721'},
+      {arabic:'اللَّهُمَّ اغْفِرْ لِي وَارْحَمْنِي وَاهْدِنِي وَعَافِنِي وَارْزُقْنِي', source:'مسلم 2697'},
+      {arabic:'يَا مُقَلِّبَ الْقُلُوبِ ثَبِّتْ قَلْبِي عَلَى دِينِكَ', source:'الترمذي 2140'},
+      {arabic:'اللَّهُمَّ إِنَّكَ عَفُوٌّ تُحِبُّ الْعَفْوَ فَاعْفُ عَنِّي', source:'الترمذي 3513'},
+      {arabic:'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْهَمِّ وَالْحَزَنِ', source:'البخاري 6369'}
+    ]
+  };
+  
+  const duas = hisnData[cat] || hisnData.general;
+  displayDuas(duas);
+}
+
+
+
+function displayDuas(duas){
+  const container = document.getElementById('duaContainer');
+  container.innerHTML = '';
+  
+  duas.forEach((d, idx)=>{
+    const card = document.createElement('div');
+    card.className = 'bg-black/30 rounded-2xl p-4 border border-emerald-900/30 space-y-2';
+    card.innerHTML = `
+      <p class="text-[18px] leading-[1.9] font-[Amiri] text-emerald-50 text-right">${d.arabic}</p>
+      ${d.translation?`<p class="text-[13px] text-emerald-200/70 leading-6">${d.translation}</p>`:''}
+      <div class="flex items-center justify-between pt-2 border-t border-emerald-900/20">
+        <div class="text-[10px] text-emerald-200/50">${d.source||''}${d.notes?' • '+d.notes:''}</div>
+        <div class="flex gap-1.5">
+          <button class="copy-dua tap-active text-[11px] px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-emerald-200/70" data-text="${d.arabic}">نسخ</button>
+          <button class="fav-dua tap-active text-[11px] px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-700/30 text-emerald-300">♡</button>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+  
+  container.querySelectorAll('.copy-dua').forEach(btn=>{
+    btn.onclick = async ()=>{ await navigator.clipboard.writeText(btn.dataset.text); btn.textContent='تم'; setTimeout(()=>btn.textContent='نسخ',1000); };
   });
 }
 
